@@ -1,0 +1,7 @@
+.mf-readonly { background: var(--tblr-bg-surface-secondary, #f6f8fb); min-height: calc(1.5em + .75rem + 2px); }
+.mf-field[data-mf-readonly="1"] .col-xxl-7 { pointer-events: none; opacity: .65; }
+.mf-table thead th { white-space: nowrap; font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; color: var(--tblr-secondary, #6c757d); }
+.mf-table td { vertical-align: middle; }
+.mf-table .select2-container { min-width: 16rem; }
+#mf-conditions .mf-cond { border: 1px solid var(--tblr-border-color, #dee2e6); border-radius: .375rem; padding: .75rem; margin-bottom: .75rem; max-width: 52rem; }
+#mf-conditions .select2-container { max-width: 100%; }
