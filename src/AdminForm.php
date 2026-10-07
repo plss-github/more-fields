@@ -56,8 +56,7 @@ final class AdminForm
             Html::redirect($class::getSearchURL());
         }
 
-        Html::header($class::getTypeName(Session::getPluralNumber()), $_SERVER['PHP_SELF'], 'config', Menu::class, Menu::optionFor($class));
-        Menu::renderSubNav(Menu::optionFor($class));
+        Html::header($class::getTypeName(Session::getPluralNumber()), $_SERVER['PHP_SELF'], 'config', Menu::class, 'container');
         $obj->display(['id' => (int) ($_GET['id'] ?? 0)]);
         Html::footer();
     }
@@ -68,8 +67,7 @@ final class AdminForm
     public static function list(string $class, string $menu_option): void
     {
         Session::checkRight('config', READ);
-        Html::header($class::getTypeName(Session::getPluralNumber()), $_SERVER['PHP_SELF'], 'config', Menu::class, Menu::optionFor($class));
-        Menu::renderSubNav(Menu::optionFor($class));
+        Html::header($class::getTypeName(Session::getPluralNumber()), $_SERVER['PHP_SELF'], 'config', Menu::class, $menu_option);
         \Search::show($class);
         Html::footer();
     }

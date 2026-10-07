@@ -25,31 +25,6 @@ campo oculto ou somente leitura nunca é gravado.
 
 Menu: Configurar > More Fields. Busca: cada campo vira uma coluna (opção `79000 + id do campo`).
 
-## Salvar tudo (aba Campos do bloco)
-
-Na aba **Campos** de um bloco, todas as linhas se editam de uma vez (ordem, itens, onde exibir, aba, obrigatório,
-somente leitura) e um único **Salvar tudo** grava tudo, numa transação: se qualquer linha for recusada, nenhuma é gravada.
-O botão mostra quantas linhas foram alteradas, as linhas alteradas ficam destacadas, e a página avisa se você tentar sair
-com alterações não salvas. Excluir continua sendo por linha.
-
-## Tipos de item
-
-"Vale para os itens" (e o alvo de um campo "Item do GLPI") oferece cerca de 190 tipos, agrupados: ativos (inclusive os
-personalizados), componentes (Cartão SIM, Memória, Disco...), gerência (Linhas, Contratos, Fornecedores, Racks...),
-assistência, ferramentas, administração e os cadastros auxiliares do GLPI (tipos, modelos, categorias...). A lista vem dos
-registros do próprio GLPI.
-
-**Cadastro × unidade física.** "Cartão SIM" é o cadastro do chip (`DeviceSimcard`, tela `devicesimcard.form.php`); "Cartão SIM
-(unidade física)" é cada chip real (`Item_DeviceSimcard`, tela `item_devicesimcard.form.php`, com serial, PIN, linha, local...).
-O mesmo vale para memória, disco, bateria etc. (grupo *Componentes — unidades físicas*). O valor de um campo fica no tipo
-escolhido: um campo ligado ao cadastro não aparece na unidade física, e vice-versa. Ficam de fora outras relações entre
-itens e tarefas, que não têm formulário próprio.
-
-## Navegação
-
-Uma única entrada no menu (**Configurar > More Fields**). No topo de todas as páginas do plugin há uma barra de abas:
-**Blocos de campos · Campos · Listas de valores · Configurações**.
-
 ## Configurações (More Fields > Configurações)
 
 - **Ao desinstalar:** *manter os dados* (padrão) ou *apagar tudo*. Apagando, gera antes um backup
@@ -57,12 +32,7 @@ Uma única entrada no menu (**Configurar > More Fields**). No topo de todas as p
 - **Exigir obrigatórios em criações sem formulário** (API, importação): desligado por padrão. Vale só para campos do
   formulário principal; deixe desligado se algum caminho de criação não exibe os campos.
 - **Integridade:** lista e corrige sobras de exclusões, valores duplicados e valores de itens/opções inexistentes.
-- **Backups:** *Gerar backup agora* grava um arquivo `.jsonl.gz` em `files/_plugins/morefields/backups` (uma linha por
-  registro, mais uma linha inicial com a lista de tabelas). A mesma tela lista os arquivos, com **Baixar** e **Restaurar**.
-  Restaurar **substitui** todos os dados do plugin pelos do arquivo: o arquivo é validado inteiro antes (formato, tabelas e
-  colunas), um backup de segurança do estado atual (`before-restore-…`) é gerado antes, e a troca é feita numa transação
-  (se falhar, nada muda). Os backups gerados ao desinstalar com "apagar tudo" (`uninstall-…`) servem para recuperar:
-  reinstale o plugin e restaure o arquivo. O backup cobre as tabelas do plugin, não as configurações da tela.
+- **Gerar backup agora.**
 
 ## Clonar, modelos e transferência
 

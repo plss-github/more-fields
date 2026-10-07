@@ -177,7 +177,7 @@ class FieldDefinition extends AdminItem
         echo '</td><td colspan="2"></td></tr>';
 
         echo "<tr class='tab_bg_1' data-mf-cfg='glpi_item'><td>" . __s('Tipo de item', 'morefields') . '</td><td>';
-        Dropdown::showFromArray('cfg_itemtype', FieldType::getLinkableItemtypeGroups(), ['value' => $config['itemtype'] ?? '', 'display_emptychoice' => true]);
+        Dropdown::showFromArray('cfg_itemtype', FieldType::getLinkableItemtypes(), ['value' => $config['itemtype'] ?? '', 'display_emptychoice' => true]);
         echo '</td><td colspan="2"></td></tr>';
 
         echo "<tr class='tab_bg_1'><td>" . __s('Copiar ao clonar', 'morefields') . '</td><td>';

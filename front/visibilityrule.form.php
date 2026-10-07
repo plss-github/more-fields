@@ -42,8 +42,7 @@ if (isset($_POST['add'])) {
     Html::redirect($back_to($container_id));
 }
 
-Html::header(VisibilityRule::getTypeName(1), $_SERVER['PHP_SELF'], 'config', Menu::class, Menu::optionFor(VisibilityRule::class));
-Menu::renderSubNav(Menu::optionFor(VisibilityRule::class));
+Html::header(VisibilityRule::getTypeName(1), $_SERVER['PHP_SELF'], 'config', Menu::class, 'container');
 
 $id = (int) ($_GET['id'] ?? 0);
 if ($id > 0) {
