@@ -108,8 +108,10 @@ final class ValueRepository
             }
             $DB->commit();
         } catch (\Throwable $e) {
-            if ($DB->isInTransaction()) {
+            try {
                 $DB->rollBack();
+            } catch (\Throwable) {
+                // já fora da transação (isInTransaction() é privado no GLPI): nada a desfazer
             }
             throw $e;
         } finally {
