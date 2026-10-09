@@ -99,27 +99,105 @@ final class FieldType
         return $type === self::MULTICHOICE;
     }
 
-    /** Itemtypes oferecidos no tipo "Item do GLPI". */
-    public static function getLinkableItemtypes(): array
+    /**
+     * Tipos de item que podem receber campos (e que podem ser alvo de um campo
+     * "Item do GLPI"), agrupados para o seletor. Vêm dos registros do próprio GLPI
+     * (ativos, componentes, dropdowns padrão) mais uma lista fixa de itens de
+     * gerência, assistência, ferramentas e administração. Só entram classes que
+     * têm tabela, formulário próprio e não são relações entre itens.
+     *
+     * @return array<string, array<string, string>> grupo => [itemtype => rótulo]
+     */
+    public static function getLinkableItemtypeGroups(): array
     {
         global $CFG_GLPI;
+        static $cache = null;
+        if ($cache !== null) {
+            return $cache;
+        }
 
-        $list = array_merge(
-            $CFG_GLPI['asset_types'] ?? [],
-            [
-                'User', 'Group', 'Entity', 'Location', 'Supplier', 'Contact', 'Contract',
-                'Project', 'Budget', 'ITILCategory', 'Manufacturer', 'State', 'Ticket', 'Problem', 'Change',
-            ]
-        );
-        $result = [];
-        foreach (array_unique($list) as $itemtype) {
-            if (class_exists($itemtype) && ($item = getItemForItemtype($itemtype))) {
-                $result[$itemtype] = $item::getTypeName(1);
+        $candidates = [
+            __('Ativos', 'morefields')         => $CFG_GLPI['asset_types'] ?? [],
+            __('Componentes', 'morefields')    => $CFG_GLPI['device_types'] ?? [],
+            __('Gerência', 'morefields')       => [
+                'Software', 'Line', 'Contract', 'Supplier', 'Contact', 'Budget', 'Document', 'Certificate',
+                'Domain', 'Appliance', 'Cluster', 'DatabaseInstance', 'CartridgeItem', 'ConsumableItem',
+                'Datacenter', 'DCRoom', 'Rack', 'Enclosure', 'PDU', 'PassiveDCEquipment', 'Cable',
+            ],
+            __('Assistência', 'morefields')    => ['Ticket', 'Problem', 'Change'],
+            __('Ferramentas', 'morefields')    => ['Project', 'Reminder', 'RSSFeed', 'KnowbaseItem'],
+            __('Administração', 'morefields')  => ['User', 'Group', 'Entity', 'Profile'],
+        ];
+        // Unidades físicas de cada componente (ex.: o chip SIM em si, não o seu cadastro). Têm
+        // formulário próprio (item_devicesimcard.form.php etc.), onde ficam serial, ICCID, local...
+        $units = [];
+        foreach ($CFG_GLPI['device_types'] ?? [] as $device) {
+            if (is_string($device) && class_exists('Item_' . $device)) {
+                $units[] = 'Item_' . $device;
             }
         }
-        asort($result);
+        $candidates[__('Componentes — unidades físicas', 'morefields')] = $units;
 
-        return $result;
+        // Cadastros auxiliares (tipos, modelos, categorias...) agrupados como no menu de Dropdowns do GLPI.
+        foreach (\Dropdown::getStandardDropdownItemTypes() as $group => $classes) {
+            $candidates[(string) $group] = array_merge($candidates[(string) $group] ?? [], array_keys($classes));
+        }
+
+        $seen   = [];
+        $groups = [];
+        foreach ($candidates as $group => $classes) {
+            foreach ($classes as $itemtype) {
+                if (!is_string($itemtype) || isset($seen[$itemtype]) || !self::isLinkableItemtype($itemtype)) {
+                    continue;
+                }
+                $seen[$itemtype] = true;
+                $groups[$group][$itemtype] = is_subclass_of($itemtype, \Item_Devices::class)
+                    ? sprintf(__('%s (unidade física)', 'morefields'), getItemForItemtype(substr($itemtype, strlen('Item_')))::getTypeName(1))
+                    : getItemForItemtype($itemtype)::getTypeName(1);
+            }
+        }
+        foreach ($groups as &$items) {
+            asort($items);
+        }
+        unset($items);
+
+        return $cache = $groups;
+    }
+
+    /** Classe com tabela e formulário próprios (exclui relações entre itens, tarefas, acompanhamentos...). */
+    private static function isLinkableItemtype(string $itemtype): bool
+    {
+        global $DB;
+
+        if (!class_exists($itemtype) || !is_subclass_of($itemtype, \CommonDBTM::class)) {
+            return false;
+        }
+        $ref = new \ReflectionClass($itemtype);
+        // Relações entre itens não têm formulário próprio; a exceção são as unidades físicas
+        // de componentes (Item_Devices), que têm.
+        if (
+            $ref->isAbstract()
+            || (is_subclass_of($itemtype, \CommonDBRelation::class) && !is_subclass_of($itemtype, \Item_Devices::class))
+            || (is_subclass_of($itemtype, \CommonDBConnexity::class) && !is_subclass_of($itemtype, \Item_Devices::class))
+            || is_subclass_of($itemtype, \CommonITILTask::class)
+        ) {
+            return false;
+        }
+        $item = getItemForItemtype($itemtype);
+
+        return $item instanceof \CommonDBTM && $item::getTable() !== '' && $DB->tableExists($item::getTable());
+    }
+
+    /** Lista plana itemtype => rótulo (validação e compatibilidade). */
+    public static function getLinkableItemtypes(): array
+    {
+        $flat = [];
+        foreach (self::getLinkableItemtypeGroups() as $items) {
+            $flat += $items;
+        }
+        asort($flat);
+
+        return $flat;
     }
 
     /**

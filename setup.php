@@ -20,7 +20,7 @@ use GlpiPlugin\Morefields\Binding;
 use GlpiPlugin\Morefields\Injector;
 use GlpiPlugin\Morefields\Menu;
 
-define('PLUGIN_MOREFIELDS_VERSION', '1.2.0');
+define('PLUGIN_MOREFIELDS_VERSION', '1.2.1');
 define('PLUGIN_MOREFIELDS_MIN_GLPI', '11.0.0');
 define('PLUGIN_MOREFIELDS_MAX_GLPI', '11.0.99');
 

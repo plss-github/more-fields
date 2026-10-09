@@ -34,6 +34,25 @@ if (isset($_POST['fix'])) {
     Session::addMessageAfterRedirect(sprintf(__s('Integridade corrigida: %d registro(s) removido(s).', 'morefields'), array_sum($removed)), false, INFO);
     Html::back();
 }
+if (isset($_POST['restore'])) {
+    Session::checkRight('config', UPDATE);
+    try {
+        $result = Backup::restore((string) ($_POST['file'] ?? ''));
+        Session::addMessageAfterRedirect(
+            sprintf(
+                __s('Backup restaurado: %1$d registro(s) em %2$d tabela(s). Backup de segurança do estado anterior: %3$s', 'morefields'),
+                array_sum($result['tables']),
+                count($result['tables']),
+                htmlescape(basename((string) $result['safety_backup']))
+            ),
+            false,
+            INFO
+        );
+    } catch (\Throwable $e) {
+        Session::addMessageAfterRedirect(htmlescape($e->getMessage()), false, ERROR);
+    }
+    Html::back();
+}
 if (isset($_POST['backup'])) {
     Session::checkRight('config', UPDATE);
     try {
@@ -45,7 +64,8 @@ if (isset($_POST['backup'])) {
     Html::back();
 }
 
-Html::header(__('Configurações', 'morefields'), $_SERVER['PHP_SELF'], 'config', Menu::class, 'settings');
+Html::header(__('Configurações', 'morefields'), $_SERVER['PHP_SELF'], 'config', Menu::class, Menu::OPTION_SETTINGS);
+Menu::renderSubNav(Menu::OPTION_SETTINGS);
 
 $cfg      = Settings::all();
 $can_edit = Session::haveRight('config', UPDATE);
@@ -92,6 +112,29 @@ if ($can_edit) {
     }
     echo '</div>';
 }
-echo '</div></div>';
+echo '</div>';
+
+// ---- backups existentes: baixar e restaurar
+$files = Backup::files();
+echo "<div class='card mb-4'><div class='card-header'><h3 class='card-title'><i class='ti ti-database-export me-2'></i>" . __s('Backups', 'morefields') . '</h3></div>';
+if ($files === []) {
+    echo "<div class='card-body text-muted'>" . __s('Nenhum backup ainda. Use "Gerar backup agora" acima.', 'morefields') . '</div>';
+} else {
+    echo "<div class='table-responsive'><table class='table table-sm align-middle mb-0'><thead><tr><th>" . __s('Arquivo', 'morefields') . '</th><th>' . __s('Gerado em', 'morefields') . "</th><th class='text-end'>" . __s('Tamanho', 'morefields') . '</th><th></th></tr></thead><tbody>';
+    foreach ($files as $f) {
+        $confirm = __s('Restaurar este backup? TODOS os dados atuais do plugin (campos, blocos, regras, listas e valores) serão substituídos pelos do arquivo. Um backup de segurança do estado atual é gerado antes.', 'morefields');
+        echo '<tr><td><code>' . htmlescape($f['name']) . '</code></td><td>' . htmlescape(Html::convDateTime(date('Y-m-d H:i:s', $f['time']))) . "</td><td class='text-end'>" . htmlescape(Toolbox::getSize($f['size'])) . "</td><td class='text-end text-nowrap'>";
+        echo "<a class='btn btn-sm btn-outline-secondary me-1' href='" . htmlescape(PLUGIN_MOREFIELDS_WEBDIR . '/front/backup.php?file=' . rawurlencode($f['name'])) . "'><i class='ti ti-download me-1'></i>" . __s('Baixar', 'morefields') . '</a>';
+        if ($can_edit) {
+            echo "<form method='post' action='" . htmlescape($action) . "' class='d-inline' onsubmit=\"return confirm('" . $confirm . "')\">" . $token
+                . "<input type='hidden' name='file' value='" . htmlescape($f['name']) . "'>"
+                . "<button class='btn btn-sm btn-outline-danger' name='restore' type='submit'><i class='ti ti-restore me-1'></i>" . __s('Restaurar', 'morefields') . '</button></form>';
+        }
+        echo '</td></tr>';
+    }
+    echo '</tbody></table></div>';
+}
+echo "<div class='card-footer text-muted small'>" . __s('Os arquivos ficam em files/_plugins/morefields/backups. Para restaurar após uma desinstalação com "apagar tudo": reinstale o plugin e restaure o arquivo "uninstall-…".', 'morefields') . '</div></div>';
+echo '</div>';
 
 Html::footer();

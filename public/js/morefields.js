@@ -242,7 +242,33 @@
         if (box) { box.style.display = select.value === 'tab' ? '' : 'none'; }
     }
 
+    /* "Salvar tudo" (aba Campos do bloco): marca as linhas alteradas, mostra quantas no botão e
+     * avisa antes de sair da página com alterações não salvas. */
+    let mfDirty = 0;
+    let mfSaving = false;
+    const mfValue = el => el.type === 'checkbox' ? String(el.checked)
+        : (el.multiple ? Array.from(el.selectedOptions).map(o => o.value).sort().join(',') : el.value);
+
+    function trackDirty() {
+        const controls = document.querySelectorAll('[form="mf_cf_all"][name^="rows["]');
+        if (!controls.length) { mfDirty = 0; return; }
+        const rows = new Set();
+        controls.forEach(el => {
+            if (el.dataset.mfInit === undefined) { el.dataset.mfInit = mfValue(el); }
+            if (el.dataset.mfInit !== mfValue(el)) { rows.add(el.closest('tr')); }
+        });
+        document.querySelectorAll('.mf-table tbody tr').forEach(tr => tr.classList.toggle('table-warning', rows.has(tr)));
+        document.querySelectorAll('[data-mf-save-count]').forEach(badge => {
+            // Só escreve quando muda: alterar o texto dispara o MutationObserver (que chama boot() de novo).
+            if (badge.textContent !== String(rows.size)) { badge.textContent = String(rows.size); }
+            const display = rows.size ? '' : 'none';
+            if (badge.style.display !== display) { badge.style.display = display; }
+        });
+        mfDirty = rows.size;
+    }
+
     function boot() {
+        trackDirty();
         document.querySelectorAll('form select[name=placement]').forEach(syncPlacement);
         document.querySelectorAll('#mf-conditions').forEach(initConditionEditor);
         evaluateAll();
@@ -257,8 +283,13 @@
         new MutationObserver(boot).observe(document.body, {childList: true, subtree: true});
         if (window.jQuery) {
             window.jQuery(document).on('change', 'select[name=placement]', e => syncPlacement(e.target));
+            window.jQuery(document).on('change input', '[form="mf_cf_all"]', trackDirty);
             window.jQuery(document).on('change', 'form select, form input, form textarea', evaluateAll);
         }
         document.addEventListener('input', evaluateAll);
+        document.addEventListener('submit', () => { mfSaving = true; }, true);
+        window.addEventListener('beforeunload', e => {
+            if (mfDirty > 0 && !mfSaving) { e.preventDefault(); e.returnValue = ''; }
+        });
     });
 })();
