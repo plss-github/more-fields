@@ -391,6 +391,12 @@ class FieldDefinition extends AdminItem
                 default:
                     $opt['datatype'] = 'string';
             }
+            // A tabela de valores não tem classe: sem 'itemtype' o GLPI 11 passa null
+            // para getItemForItemtype() e quebra a listagem. Com uma classe real (sem
+            // getSpecificValueToDisplay para estas colunas) ele exibe o valor padrão.
+            if ($opt['table'] === $values_table) {
+                $opt['itemtype'] = self::class;
+            }
             $options[] = $opt;
         }
 

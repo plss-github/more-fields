@@ -56,6 +56,11 @@ final class Injector
 
     private static function pre(CommonDBTM $item, bool $adding): void
     {
+        // Respostas de um Formulário do GLPI (ver Form\DestinationField).
+        $answers = $item->input['_morefields_answers'] ?? null;
+        unset($item->input['_morefields_answers']);
+        $answer_writes = is_array($answers) && $answers !== [] ? Saver::prepareAnswers($item, $answers) : [];
+
         $posted = $item->input['_morefields'] ?? null;
         if (!is_array($posted)) {
             // Criação sem formulário (API, importação): só cobra os obrigatórios se o admin ligou.
@@ -66,10 +71,19 @@ final class Injector
                 && !isset($item->input['_oldID'])
                 && empty($item->input['is_template'])
             ) {
-                $errors = Saver::requiredErrorsWithoutForm($item, $item->input);
+                $errors = Saver::requiredErrorsWithoutForm($item, $item->input, $answer_writes);
                 if ($errors !== []) {
                     Saver::reportErrors($errors);
                     $item->input = [];
+
+                    return;
+                }
+            }
+            if ($answer_writes !== []) {
+                if ($adding) {
+                    $item->input['_morefields_writes'] = $answer_writes;
+                } else {
+                    Saver::apply($item, $answer_writes);
                 }
             }
 
@@ -86,8 +100,8 @@ final class Injector
         }
 
         if ($adding) {
-            // sem ID ainda: grava em item_add
-            $item->input['_morefields_writes'] = $result['writes'];
+            // sem ID ainda: grava em item_add (o que veio do formulário principal prevalece sobre as respostas)
+            $item->input['_morefields_writes'] = $result['writes'] + $answer_writes;
         } else {
             // O core só dispara item_update se algum campo do próprio item mudou;
             // gravar aqui garante que editar só os campos extras funcione.

@@ -23,6 +23,8 @@ use Session;
 
 class Choice extends AdminItem
 {
+    private const PAGE_SIZE = 100;
+
     public static function getTypeName($nb = 0)
     {
         return _n('Valor', 'Valores', $nb, 'morefields');
@@ -51,7 +53,7 @@ class Choice extends AdminItem
     public function getTabNameForItem(CommonGLPI $item, $withtemplate = 0)
     {
         if ($item instanceof ChoiceList) {
-            return self::createTabEntry(self::getTypeName(2), count(self::getList($item->getID(), false)), null, 'ti ti-list-details');
+            return self::createTabEntry(self::getTypeName(2), countElementsInTable(self::getTable(), ['plugin_morefields_choicelists_id' => (int) $item->getID()]), null, 'ti ti-list-details');
         }
 
         return '';
@@ -73,6 +75,7 @@ class Choice extends AdminItem
         $can_edit = self::canUpdate();
         $list_id  = (int) $list->getID();
         $url      = htmlescape(self::getFormURL());
+        $total    = countElementsInTable(self::getTable(), ['plugin_morefields_choicelists_id' => $list_id]);
 
         if ($can_edit) {
             echo "<div class='card mb-4'><div class='card-header'><h3 class='card-title'><i class='ti ti-plus me-2'></i>" . __s('Adicionar valor', 'morefields') . '</h3></div>';
@@ -80,13 +83,29 @@ class Choice extends AdminItem
             echo "<input type='hidden' name='plugin_morefields_choicelists_id' value='$list_id'>";
             echo "<div class='col-md-5'><label class='form-label'>" . __s('Name') . "</label><input type='text' name='name' required class='form-control'></div>";
             echo "<div class='col-auto'><label class='form-label'>" . __s('Cor', 'morefields') . "</label><input type='color' name='color' class='form-control form-control-color' value='#6c757d'></div>";
-            echo "<div class='col-auto'><label class='form-label'>" . __s('Ordem', 'morefields') . "</label><input type='number' name='ranking' class='form-control' style='width:6rem' value='" . (count(self::getList($list_id, false)) + 1) . "'></div>";
+            echo "<div class='col-auto'><label class='form-label'>" . __s('Ordem', 'morefields') . "</label><input type='number' name='ranking' class='form-control' style='width:6rem' value='" . ($total + 1) . "'></div>";
             echo "<div class='col-auto ms-auto'><button class='btn btn-primary' name='add' type='submit'><i class='ti ti-plus me-1'></i>" . __s('Add') . '</button></div>';
             echo Html::hidden('_glpi_csrf_token', ['value' => Session::getNewCSRFToken()]);
             echo '</form></div></div>';
         }
 
-        $rows = iterator_to_array($DB->request(['FROM' => self::getTable(), 'WHERE' => ['plugin_morefields_choicelists_id' => $list_id], 'ORDER' => ['ranking', 'name']]), false);
+        // Listas grandes: renderizar tudo (um formulário + token CSRF por linha) estoura o tempo
+        // de resposta; mostra uma página por vez.
+        $start = max(0, (int) ($_GET['start'] ?? 0));
+        $rows  = iterator_to_array($DB->request([
+            'FROM'   => self::getTable(),
+            'WHERE'  => ['plugin_morefields_choicelists_id' => $list_id],
+            'ORDER'  => ['ranking', 'name', 'id'],
+            'START'  => $start,
+            'LIMIT'  => self::PAGE_SIZE,
+        ]), false);
+        if ($rows === [] && $total > 0 && $start > 0) {
+            $start = 0;
+            $rows  = iterator_to_array($DB->request([
+                'FROM' => self::getTable(), 'WHERE' => ['plugin_morefields_choicelists_id' => $list_id],
+                'ORDER' => ['ranking', 'name', 'id'], 'LIMIT' => self::PAGE_SIZE,
+            ]), false);
+        }
         if ($rows === []) {
             echo "<div class='text-center text-muted py-5'><i class='ti ti-list-details fs-1 d-block mb-2'></i>" . __s('Nenhum valor nesta lista ainda.', 'morefields') . '</div>';
 
@@ -99,13 +118,17 @@ class Choice extends AdminItem
             foreach ($DB->request([
                 'SELECT'  => ['v_int', new \Glpi\DBAL\QueryExpression('COUNT(*) AS n')],
                 'FROM'    => 'glpi_plugin_morefields_values',
-                'WHERE'   => ['plugin_morefields_fielddefinitions_id' => $field_ids],
+                'WHERE'   => ['plugin_morefields_fielddefinitions_id' => $field_ids, 'v_int' => array_map(static fn($r) => (int) $r['id'], $rows)],
                 'GROUPBY' => 'v_int',
             ]) as $r) {
                 $in_use[(int) $r['v_int']] = (int) $r['n'];
             }
         }
 
+        $token = Session::getNewCSRFToken();
+        if ($total > self::PAGE_SIZE) {
+            Html::printAjaxPager(self::getTypeName(2), $start, $total, '', true, self::PAGE_SIZE);
+        }
         echo "<div class='table-responsive'><table class='table table-hover align-middle mf-table'><thead><tr>"
             . '<th>' . __s('Valor', 'morefields') . '</th><th>' . __s('Ordem', 'morefields') . '</th><th>' . __s('Situação', 'morefields') . '</th><th></th></tr></thead><tbody>';
         foreach ($rows as $row) {
@@ -125,7 +148,7 @@ class Choice extends AdminItem
                 echo "<button class='btn btn-icon btn-outline-danger btn-sm' name='purge' type='submit' title='" . __s('Delete permanently') . "' onclick=\"return confirm('" . ($in_use[(int) $row['id']] ?? 0 > 0
                     ? htmlescape(sprintf(__('%d valor(es) gravado(s) usam esta opção e serão apagados. Excluir mesmo assim?', 'morefields'), $in_use[(int) $row['id']]))
                     : __s('Confirm the final deletion?')) . "')\"><i class='ti ti-trash'></i></button>";
-                echo Html::hidden('_glpi_csrf_token', ['value' => Session::getNewCSRFToken()]);
+                echo Html::hidden('_glpi_csrf_token', ['value' => $token]);
                 echo '</form>';
             }
             echo '</td></tr>';

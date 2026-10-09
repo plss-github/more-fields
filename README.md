@@ -45,6 +45,16 @@ plugin no clone: o item de origem é obtido da pilha de chamadas (`Injector::fin
 Excluir um campo com valores exige marcar a confirmação (a tela mostra quantos valores e itens serão perdidos).
 Excluir uma lista usada por campos é recusado. A gravação de valores usa trava por item e campo (`GET_LOCK`) e transação.
 
+## Integração com Formulários (GLPI 11)
+
+Permite preencher campos do More Fields a partir de um formulário do catálogo de serviços:
+
+- **Pergunta "Campo do More Fields"** (categoria própria no editor): escolha o campo; a pergunta usa o mesmo controle do campo (lista, data, usuário, sim/não…).
+- **Destino "Campos adicionais (More Fields)"** (aba Destinos, grupo Propriedades; ligado por padrão): grava as respostas nos campos do Chamado, Problema ou Mudança criado.
+- Só são oferecidos campos vinculados a Chamado, Problema ou Mudança; para cada item criado, só entram os campos que valem para aquele tipo.
+- Respostas do formulário ignoram regras de visibilidade/somente leitura (quem preenche o formulário não vê a tela do item). Obrigatoriedade da pergunta funciona normalmente.
+- Testado no GLPI 11.0.9. A API de Formulários é recente e pode mudar entre versões.
+
 ## Fora do MVP
 
 Histórico de alterações dos valores, valor padrão, massive actions, import/export, tradução de rótulos,

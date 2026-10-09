@@ -1,0 +1,19 @@
+{#
+ # -------------------------------------------------------------------------
+ # More Fields plugin for GLPI - (C) 2026 Matheus Schmidt - GPLv2+ (ver LICENSE)
+ # -------------------------------------------------------------------------
+ #}
+
+{% import 'components/form/fields_macros.html.twig' as fields %}
+
+{{ fields.sliderField(
+    input_name,
+    value,
+    __('Preencher os campos do More Fields com as respostas', 'morefields'),
+    options|merge({
+        'label_class': 'col fw-normal pt-0',
+        'input_class': 'col-auto',
+        'label_align': 'start',
+        'mb'         : '',
+    })
+) }}

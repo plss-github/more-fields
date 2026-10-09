@@ -20,7 +20,7 @@ use GlpiPlugin\Morefields\Binding;
 use GlpiPlugin\Morefields\Injector;
 use GlpiPlugin\Morefields\Menu;
 
-define('PLUGIN_MOREFIELDS_VERSION', '1.0.0');
+define('PLUGIN_MOREFIELDS_VERSION', '1.2.0');
 define('PLUGIN_MOREFIELDS_MIN_GLPI', '11.0.0');
 define('PLUGIN_MOREFIELDS_MAX_GLPI', '11.0.99');
 
@@ -36,6 +36,8 @@ function plugin_init_morefields()
     if (!Plugin::isPluginActive('morefields')) {
         return;
     }
+
+    plugin_morefields_register_form_types();
 
     // Hooks de gravação: fora do bloco de sessão para valer também via API.
     foreach (Binding::getBoundItemtypes() as $itemtype) {
@@ -61,6 +63,42 @@ function plugin_init_morefields()
             $PLUGIN_HOOKS[Hooks::CONFIG_PAGE]['morefields'] = 'front/container.php';
             $PLUGIN_HOOKS[Hooks::MENU_TOADD]['morefields']  = ['config' => Menu::class];
         }
+    }
+}
+
+/**
+ * Integração com os Formulários do GLPI (tipo de pergunta + campo de destino). Só é registrada
+ * se o GLPI tem a API de plugins dos Formulários e há campos que valem para chamado, mudança ou
+ * problema (sem isso a pergunta não teria o que oferecer).
+ */
+function plugin_morefields_register_form_types(): void
+{
+    if (
+        !class_exists(\Glpi\Form\QuestionType\QuestionTypesManager::class)
+        || !class_exists(\Glpi\Form\Destination\FormDestinationManager::class)
+        || !\GlpiPlugin\Morefields\Form\QuestionType::hasAvailableFields()
+    ) {
+        return;
+    }
+
+    $types = \Glpi\Form\QuestionType\QuestionTypesManager::getInstance();
+    $dest  = \Glpi\Form\Destination\FormDestinationManager::getInstance();
+    if (!method_exists($types, 'registerPluginQuestionType') || !method_exists($dest, 'registerPluginCommonITILConfigField')) {
+        return;
+    }
+
+    $types->registerPluginCategory(new \GlpiPlugin\Morefields\Form\QuestionTypeCategory());
+    $types->registerPluginQuestionType(new \GlpiPlugin\Morefields\Form\QuestionType());
+
+    foreach ([
+        new \Glpi\Form\Destination\FormDestinationTicket(),
+        new \Glpi\Form\Destination\FormDestinationChange(),
+        new \Glpi\Form\Destination\FormDestinationProblem(),
+    ] as $destination) {
+        $dest->registerPluginCommonITILConfigField(
+            $destination::class,
+            new \GlpiPlugin\Morefields\Form\DestinationField(),
+        );
     }
 }
 

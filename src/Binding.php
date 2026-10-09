@@ -184,6 +184,23 @@ final class Binding
         return $result;
     }
 
+    /** O campo está em algum bloco ativo que vale para o tipo de item? */
+    public static function fieldAppliesTo(int $field_id, string $itemtype): bool
+    {
+        global $DB;
+
+        return (bool) $DB->request([
+            'SELECT'     => ['cf.id'],
+            'FROM'       => self::TABLE_FIELDS . ' AS cf',
+            'INNER JOIN' => [
+                self::TABLE_CONTAINERS . ' AS c' => ['ON' => ['cf' => 'plugin_morefields_containers_id', 'c' => 'id']],
+                self::TABLE_ITEMTYPES . ' AS i'  => ['ON' => ['i' => 'plugin_morefields_containerfields_id', 'cf' => 'id']],
+            ],
+            'WHERE'      => ['cf.plugin_morefields_fielddefinitions_id' => $field_id, 'c.is_active' => 1, 'i.itemtype' => $itemtype],
+            'LIMIT'      => 1,
+        ])->count();
+    }
+
     /** @return array<int, string[]> containerfields_id => itemtypes */
     public static function getFieldItemtypes(int $container_id): array
     {

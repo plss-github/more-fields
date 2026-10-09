@@ -1,0 +1,28 @@
+{#
+ # -------------------------------------------------------------------------
+ # More Fields plugin for GLPI - (C) 2026 Matheus Schmidt - GPLv2+ (ver LICENSE)
+ # -------------------------------------------------------------------------
+ #}
+
+{% import 'components/form/fields_macros.html.twig' as fields %}
+
+{# O seletor leva o atributo que o editor de formulários usa para gravar o campo na pergunta (extra_data). #}
+{{ fields.dropdownArrayField(
+    'field_id',
+    selected_field_id,
+    available_fields,
+    '',
+    {
+        'no_label'           : true,
+        'field_class'        : '',
+        'class'              : 'form-select form-select-sm',
+        'mb'                 : '',
+        'init'               : question is not null,
+        'add_data_attributes': {
+            'glpi-form-editor-specific-question-extra-data': ''
+        }
+    }
+) }}
+{% if type_label %}
+    <div class="form-text mt-1">{{ __('Tipo do campo:', 'morefields') }} {{ type_label }}</div>
+{% endif %}

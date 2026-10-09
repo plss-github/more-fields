@@ -77,14 +77,44 @@ final class Saver
      *
      * @return string[]
      */
-    public static function requiredErrorsWithoutForm(CommonDBTM $item, array $input): array
+    /**
+     * Respostas de um Formulário do GLPI (campo_id => resposta bruta) viram gravações normalizadas.
+     * É uma escolha explícita do administrador (pergunta ligada ao campo), então não passa pelas
+     * regras de visibilidade/somente leitura: só vale o que o campo aceita para este tipo de item.
+     *
+     * @return array<int, array{type: string, values: array}>
+     */
+    public static function prepareAnswers(CommonDBTM $item, array $answers): array
+    {
+        global $DB;
+
+        $writes = [];
+        foreach ($answers as $def_id => $raw) {
+            $def_id = (int) $def_id;
+            $def    = $DB->request(['FROM' => FieldDefinition::getTable(), 'WHERE' => ['id' => $def_id, 'is_active' => 1], 'LIMIT' => 1])->current();
+            if ($def === null || !Binding::fieldAppliesTo($def_id, $item::class)) {
+                continue;
+            }
+            $values = FieldType::normalize($def['type'], $raw);
+            if ($values !== []) {
+                $writes[$def_id] = ['type' => $def['type'], 'values' => $values];
+            }
+        }
+
+        return $writes;
+    }
+
+    /**
+     * @param array<int, array{type: string, values: array}> $provided valores já fornecidos por outro meio (ex.: respostas de formulário)
+     */
+    public static function requiredErrorsWithoutForm(CommonDBTM $item, array $input, array $provided = []): array
     {
         $entity  = $item->isEntityAssign() ? (int) ($input['entities_id'] ?? ($_SESSION['glpiactive_entity'] ?? 0)) : null;
         $assumed = [];
         foreach (Binding::getContainers($item::class, ContainerField::PLACEMENT_DOM, $entity) as $cid => $container) {
             $assumed[$cid] = ['__present' => 1];
             foreach (Binding::getContainerFields($cid, ContainerField::PLACEMENT_DOM, null, $container, $item::class) as $field) {
-                $assumed[$cid][$field['def_id']] = '';
+                $assumed[$cid][$field['def_id']] = $provided[$field['def_id']]['values'] ?? '';
             }
         }
 
