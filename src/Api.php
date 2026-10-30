@@ -99,4 +99,150 @@ final class Api
 
         return null;
     }
+
+    /**
+     * Campos ativos de qualquer tipo que valem para o itemtype (em algum bloco ativo),
+     * para importadores como o datainjection.
+     *
+     * @return array<int, array{label: string, type: string, config: array}> id da definição => dados
+     */
+    public static function getFields(string $itemtype): array
+    {
+        global $DB;
+
+        $result = [];
+        foreach ($DB->request([
+            'SELECT'     => ['d.id', 'd.label', 'd.type', 'd.config'],
+            'DISTINCT'   => true,
+            'FROM'       => FieldDefinition::getTable() . ' AS d',
+            'INNER JOIN' => [
+                'glpi_plugin_morefields_containerfields AS cf' => ['ON' => ['cf' => 'plugin_morefields_fielddefinitions_id', 'd' => 'id']],
+                'glpi_plugin_morefields_containers AS c'       => ['ON' => ['cf' => 'plugin_morefields_containers_id', 'c' => 'id']],
+                'glpi_plugin_morefields_containerfielditemtypes AS i' => ['ON' => ['i' => 'plugin_morefields_containerfields_id', 'cf' => 'id']],
+            ],
+            'WHERE'      => ['d.is_active' => 1, 'c.is_active' => 1, 'i.itemtype' => $itemtype],
+            'ORDER'      => 'd.label',
+        ]) as $row) {
+            $result[(int) $row['id']] = [
+                'label'  => (string) $row['label'],
+                'type'   => (string) $row['type'],
+                'config' => json_decode((string) $row['config'], true) ?: [],
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Converte o texto de uma planilha no valor bruto que o campo aceita:
+     * escolhas e itens do GLPI são procurados pelo nome (vários separados por "|"),
+     * Sim/Não viram 1/0. Datas e números seguem o formato interno do campo.
+     *
+     * @return array{value: mixed, error: ?string} error preenchido quando o texto não corresponde a nada
+     */
+    public static function convertImportValue(int $field_id, string $text): array
+    {
+        $def    = self::definition($field_id);
+        if ($def === null) {
+            return ['value' => $text, 'error' => "campo #$field_id não existe"];
+        }
+
+        $text = trim($text);
+        if ($text === '') {
+            return ['value' => '', 'error' => null];
+        }
+
+        $parts = FieldType::isMulti($def['type']) ? array_map('trim', explode('|', $text)) : [$text];
+        $out   = [];
+        foreach ($parts as $part) {
+            if ($part === '') {
+                continue;
+            }
+            switch ($def['type']) {
+                case FieldType::CHOICE:
+                case FieldType::MULTICHOICE:
+                    $id = array_search(mb_strtolower($part), array_map('mb_strtolower', FieldType::getChoices($def['config'])), true);
+                    if ($id === false) {
+                        return ['value' => $text, 'error' => "valor \"$part\" não existe na lista do campo \"{$def['label']}\""];
+                    }
+                    $out[] = $id;
+                    break;
+                case FieldType::GLPI_ITEM:
+                    $id = self::findItemId((string) ($def['config']['itemtype'] ?? ''), $part);
+                    if ($id === null) {
+                        return ['value' => $text, 'error' => "item \"$part\" não encontrado"];
+                    }
+                    $out[] = $id;
+                    break;
+                case FieldType::YESNO:
+                    $yes = ['1', 'sim', 'yes', 's', 'y', 'true'];
+                    $no  = ['0', 'não', 'nao', 'no', 'n', 'false'];
+                    $key = mb_strtolower($part);
+                    if (!in_array($key, array_merge($yes, $no), true)) {
+                        return ['value' => $text, 'error' => "\"$part\" não é Sim/Não"];
+                    }
+                    $out[] = in_array($key, $yes, true) ? 1 : 0;
+                    break;
+                default:
+                    $out[] = $part;
+            }
+        }
+
+        if (FieldType::normalize($def['type'], $out) === []) {
+            return ['value' => $text, 'error' => "valor \"$text\" inválido para o campo \"{$def['label']}\" ({$def['type']})"];
+        }
+
+        return ['value' => FieldType::isMulti($def['type']) ? $out : ($out[0] ?? ''), 'error' => null];
+    }
+
+    /**
+     * Grava vários valores brutos (id da definição => valor) em um item já existente,
+     * com a mesma validação do formulário do GLPI. Retorna os erros por campo.
+     *
+     * @param array<int, mixed> $answers
+     *
+     * @return string[]
+     */
+    public static function setValues(\CommonDBTM $item, array $answers): array
+    {
+        $writes = Saver::prepareAnswers($item, $answers);
+        Saver::apply($item, $writes);
+
+        $errors = [];
+        foreach (array_diff_key($answers, $writes) as $def_id => $raw) {
+            $errors[] = (self::describe((int) $def_id) ?? "#$def_id") . ': valor não aceito';
+        }
+
+        return $errors;
+    }
+
+    private static function definition(int $field_id): ?array
+    {
+        global $DB;
+
+        $row = $DB->request(['FROM' => FieldDefinition::getTable(), 'WHERE' => ['id' => $field_id], 'LIMIT' => 1])->current();
+
+        return $row === null ? null : ['label' => (string) $row['label'], 'type' => (string) $row['type'], 'config' => json_decode((string) $row['config'], true) ?: []];
+    }
+
+    private static function findItemId(string $itemtype, string $name): ?int
+    {
+        global $DB;
+
+        if (!is_a($itemtype, \CommonDBTM::class, true)) {
+            return null;
+        }
+        if (ctype_digit($name)) {
+            $item = new $itemtype();
+
+            return $item->getFromDB((int) $name) ? (int) $name : null;
+        }
+        $table = getTableForItemType($itemtype);
+        if (!$DB->fieldExists($table, 'name')) {
+            return null;
+        }
+        $row = $DB->request(['SELECT' => ['id'], 'FROM' => $table, 'WHERE' => ['name' => $name], 'LIMIT' => 1])->current();
+
+        return $row === null ? null : (int) $row['id'];
+    }
 }

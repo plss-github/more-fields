@@ -377,6 +377,8 @@ class FieldDefinition extends AdminItem
                     $opt['datatype']   = 'dropdown';
                     $opt['linkfield']  = 'v_int';
                     $opt['joinparams'] = ['beforejoin' => ['table' => $values_table, 'joinparams' => $join]];
+                    // Sem isto o filtro da busca lista os valores de todas as listas
+                    $opt['condition']  = ['plugin_morefields_choicelists_id' => (int) ($config['choicelist'] ?? 0)];
                     break;
                 case FieldType::GLPI_ITEM:
                     $target = (string) ($config['itemtype'] ?? '');
