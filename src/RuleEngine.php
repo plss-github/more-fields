@@ -81,6 +81,8 @@ final class RuleEngine
             'entity'       => [$ctx['entity'] ?? ''],
             'itilcategory' => [$ctx['itilcategory'] ?? ''],
             'status'       => [$ctx['status'] ?? ''],
+            'status_problem' => [$ctx['status_problem'] ?? ''],
+            'status_change'  => [$ctx['status_change'] ?? ''],
             'type'         => [$ctx['type'] ?? ''],
             'field'        => (array) ($ctx['field'][$cond['fid']] ?? []),
             default        => [],

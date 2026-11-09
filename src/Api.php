@@ -102,7 +102,7 @@ final class Api
 
     /**
      * Campos ativos de qualquer tipo que valem para o itemtype (em algum bloco ativo),
-     * para importadores como o datainjection.
+     * para importadores em massa (como o plugin bulkimport).
      *
      * @return array<int, array{label: string, type: string, config: array}> id da definição => dados
      */

@@ -25,6 +25,9 @@ campo oculto ou somente leitura nunca é gravado.
 
 Menu: Configurar > More Fields. Busca: cada campo vira uma coluna (opção `79000 + id do campo`).
 
+Ações massivas: todos os campos aparecem em **Atualizar** (grupo More Fields). O valor passa
+pelas mesmas regras da edição normal (visibilidade, somente leitura, obrigatório) e entra no histórico; deixar em branco limpa o campo.
+
 ## Salvar tudo (aba Campos do bloco)
 
 Na aba **Campos** de um bloco, todas as linhas se editam de uma vez (ordem, itens, onde exibir, aba, obrigatório,

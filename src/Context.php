@@ -56,6 +56,9 @@ final class Context
             'entity'       => (string) $entity,
             'itilcategory' => (string) $get('itilcategories_id'),
             'status'       => (string) $get('status'),
+            'itemtype'     => $item::class,
+            'status_problem' => $item instanceof \Problem ? (string) $get('status') : '',
+            'status_change'  => $item instanceof \Change ? (string) $get('status') : '',
             'type'         => (string) $get('type'),
             'field'        => $fields,
         ];

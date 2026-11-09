@@ -23,7 +23,8 @@ use Session;
 
 class Choice extends AdminItem
 {
-    private const PAGE_SIZE = 100;
+    private const PAGE_SIZE  = 100;
+    private const PAGE_SIZES = [25, 50, 100, 250, 500];
 
     public static function getTypeName($nb = 0)
     {
@@ -90,24 +91,38 @@ class Choice extends AdminItem
         }
 
         // Listas grandes: renderizar tudo (um formulário + token CSRF por linha) estoura o tempo
-        // de resposta; mostra uma página por vez.
+        // de resposta; mostra uma página por vez, com busca por nome e tamanho de página escolhido.
+        $search = trim((string) ($_GET['mf_q'] ?? ''));
+        $limit  = (int) ($_GET['mf_limit'] ?? self::PAGE_SIZE);
+        if (!in_array($limit, self::PAGE_SIZES, true)) {
+            $limit = self::PAGE_SIZE;
+        }
+        $where = ['plugin_morefields_choicelists_id' => $list_id];
+        if ($search !== '') {
+            $where[] = ['name' => ['LIKE', '%' . self::escapeLike($search) . '%']];
+        }
+        $found = countElementsInTable(self::getTable(), $where);
         $start = max(0, (int) ($_GET['start'] ?? 0));
-        $rows  = iterator_to_array($DB->request([
+        if ($start >= $found) {
+            $start = 0;
+        }
+        $rows = iterator_to_array($DB->request([
             'FROM'   => self::getTable(),
-            'WHERE'  => ['plugin_morefields_choicelists_id' => $list_id],
+            'WHERE'  => $where,
             'ORDER'  => ['ranking', 'name', 'id'],
             'START'  => $start,
-            'LIMIT'  => self::PAGE_SIZE,
+            'LIMIT'  => $limit,
         ]), false);
-        if ($rows === [] && $total > 0 && $start > 0) {
-            $start = 0;
-            $rows  = iterator_to_array($DB->request([
-                'FROM' => self::getTable(), 'WHERE' => ['plugin_morefields_choicelists_id' => $list_id],
-                'ORDER' => ['ranking', 'name', 'id'], 'LIMIT' => self::PAGE_SIZE,
-            ]), false);
+
+        if ($total > 0) {
+            self::showToolbar($search, $limit, $start, $found, $total);
         }
         if ($rows === []) {
-            echo "<div class='text-center text-muted py-5'><i class='ti ti-list-details fs-1 d-block mb-2'></i>" . __s('Nenhum valor nesta lista ainda.', 'morefields') . '</div>';
+            if ($total === 0) {
+                echo "<div class='text-center text-muted py-5'><i class='ti ti-list-details fs-1 d-block mb-2'></i>" . __s('Nenhum valor nesta lista ainda.', 'morefields') . '</div>';
+            } else {
+                echo "<div class='text-center text-muted py-5'><i class='ti ti-search-off fs-1 d-block mb-2'></i>" . __s('Nenhum valor encontrado para a pesquisa.', 'morefields') . '</div>';
+            }
 
             return;
         }
@@ -126,9 +141,6 @@ class Choice extends AdminItem
         }
 
         $token = Session::getNewCSRFToken();
-        if ($total > self::PAGE_SIZE) {
-            Html::printAjaxPager(self::getTypeName(2), $start, $total, '', true, self::PAGE_SIZE);
-        }
         echo "<div class='table-responsive'><table class='table table-hover align-middle mf-table'><thead><tr>"
             . '<th>' . __s('Valor', 'morefields') . '</th><th>' . __s('Ordem', 'morefields') . '</th><th>' . __s('Situação', 'morefields') . '</th><th></th></tr></thead><tbody>';
         foreach ($rows as $row) {
@@ -154,6 +166,51 @@ class Choice extends AdminItem
             echo '</td></tr>';
         }
         echo '</tbody></table></div>';
+    }
+
+    private static function escapeLike(string $text): string
+    {
+        return addcslashes($text, '\\%_');
+    }
+
+    /** Busca por nome, tamanho de página e navegação (a aba é recarregada por reloadTab). */
+    private static function showToolbar(string $search, int $limit, int $start, int $found, int $total): void
+    {
+        $id    = 'mf_choice_' . mt_rand();
+        $from  = $found === 0 ? 0 : $start + 1;
+        $to    = min($start + $limit, $found);
+        $last  = $found > 0 ? intdiv($found - 1, $limit) * $limit : 0;
+        $go    = static fn(int $s): string => "mfChoiceGo('$id',$s)";
+        $nav   = static fn(string $icon, int $target, bool $enabled, string $title): string
+            => "<button type='button' class='btn btn-icon btn-outline-secondary btn-sm'"
+            . ($enabled ? " onclick=\"" . $go($target) . "\"" : ' disabled')
+            . " title='" . htmlescape($title) . "'><i class='ti $icon'></i></button>";
+
+        echo "<div class='d-flex flex-wrap align-items-center gap-2 mb-3' id='$id'>";
+        echo "<div class='input-group' style='max-width:22rem'><span class='input-group-text'><i class='ti ti-search'></i></span>"
+            . "<input type='search' class='form-control' data-mf-q value='" . htmlescape($search) . "' placeholder='" . __s('Pesquisar valor...', 'morefields') . "'"
+            . " onkeydown=\"if(event.key==='Enter'){event.preventDefault();" . $go(0) . ";}\">"
+            . "<button type='button' class='btn btn-outline-secondary' onclick=\"" . $go(0) . "\">" . __s('Search') . '</button></div>';
+        if ($search !== '') {
+            echo "<button type='button' class='btn btn-ghost-secondary' onclick=\"this.parentNode.querySelector('[data-mf-q]').value='';" . $go(0) . "\"><i class='ti ti-x me-1'></i>" . __s('Limpar', 'morefields') . '</button>';
+        }
+        echo "<span class='ms-md-auto text-muted'>" . htmlescape(sprintf(__('De %1$d a %2$d de %3$d', 'morefields'), $from, $to, $found))
+            . ($found !== $total ? ' ' . htmlescape(sprintf(__('(%d no total)', 'morefields'), $total)) : '') . '</span>';
+        echo "<select class='form-select w-auto' data-mf-limit onchange=\"" . $go(0) . "\" title='" . __s('Valores por página', 'morefields') . "'>";
+        foreach (self::PAGE_SIZES as $size) {
+            echo "<option value='$size'" . ($size === $limit ? ' selected' : '') . ">$size</option>";
+        }
+        echo '</select>';
+        echo "<div class='btn-group'>"
+            . $nav('ti-chevrons-left', 0, $start > 0, __('Start'))
+            . $nav('ti-chevron-left', max(0, $start - $limit), $start > 0, __('Previous'))
+            . $nav('ti-chevron-right', $start + $limit, $start + $limit < $found, __('Next'))
+            . $nav('ti-chevrons-right', $last, $start + $limit < $found, __('End'))
+            . '</div>';
+        echo '</div>';
+        echo "<script>window.mfChoiceGo=window.mfChoiceGo||function(id,start){var r=document.getElementById(id);"
+            . "var q=r.querySelector('[data-mf-q]').value.trim(),l=r.querySelector('[data-mf-limit]').value;"
+            . "reloadTab('start='+start+'&mf_limit='+encodeURIComponent(l)+'&mf_q='+encodeURIComponent(q));};</script>";
     }
 
     protected function historyParent(): ?array

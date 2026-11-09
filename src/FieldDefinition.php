@@ -296,6 +296,27 @@ class FieldDefinition extends AdminItem
     }
 
     /**
+     * HTML do controle da ação massiva "Atualizar" para o campo `$fid`, ou null se não existir. O nome é `<coluna>[<id do campo>]`: o GLPI repassa ao
+     * update() só o valor de `<coluna>`, e a chave leva o id do campo (várias colunas são compartilhadas).
+     */
+    public static function massiveActionInput(int $fid, string $column): ?string
+    {
+        $def = new self();
+        if ($fid <= 0 || !$def->getFromDB($fid)) {
+            return null;
+        }
+        $type = (string) $def->fields['type'];
+        if ($type === FieldType::GLPI_ITEM) {
+            // A tabela da opção é a do item de destino (não é do plugin): o GLPI nem chama o
+            // gancho e usa o dropdown padrão. Ver Injector::massiveActionPosted.
+            return null;
+        }
+        $field = ['type' => $type, 'config' => json_decode((string) $def->fields['config'], true) ?: []];
+
+        return FieldType::renderInput($field, [], $column . '[' . $fid . ']');
+    }
+
+    /**
      * Opções de busca para o itemtype: um campo por definição presente em
      * algum bloco ativo ligado a ele.
      */
@@ -342,7 +363,10 @@ class FieldDefinition extends AdminItem
             $opt = [
                 'id'            => self::SEARCH_OPTION_BASE + $fid,
                 'name'          => $row['label'],
-                'massiveaction' => false,
+                // Ação massiva "Atualizar": o controle vem de plugin_morefields_MassiveActionsFieldsDisplay
+                // (o "Item do GLPI" usa o dropdown padrão do GLPI) e a gravação de Injector::pre.
+                'massiveaction' => true,
+                'morefields_id' => $fid,
                 'joinparams'    => $join,
                 'forcegroupby'  => true,
                 'table'         => $values_table,

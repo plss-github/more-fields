@@ -7,7 +7,8 @@
      * Runtime: espelha src/RuleEngine.php (o servidor continua sendo a autoridade).
      * ------------------------------------------------------------------ */
 
-    const CORE_INPUTS = {itilcategory: 'itilcategories_id', status: 'status', type: 'type'};
+    const CORE_INPUTS = {itilcategory: 'itilcategories_id', status: 'status', status_problem: 'status', status_change: 'status', type: 'type'};
+    const CORE_ITEMTYPE = {status_problem: 'Problem', status_change: 'Change'};
 
     function readRow(row) {
         const select = row.querySelector('select');
@@ -23,6 +24,9 @@
         if (cond.c === 'field') {
             const row = document.querySelector('.mf-field[data-mf-def="' + cond.fid + '"]');
             return row ? readRow(row) : ((ctx.field || {})[cond.fid] || []);
+        }
+        if (CORE_ITEMTYPE[cond.c] && ctx.itemtype !== CORE_ITEMTYPE[cond.c]) {
+            return [''];
         }
         if (CORE_INPUTS[cond.c]) {
             const el = cfg.mode === 'dom' && form ? form.querySelector('[name="' + CORE_INPUTS[cond.c] + '"]') : null;

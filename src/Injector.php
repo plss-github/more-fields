@@ -62,6 +62,9 @@ final class Injector
         $answer_writes = is_array($answers) && $answers !== [] ? Saver::prepareAnswers($item, $answers) : [];
 
         $posted = $item->input['_morefields'] ?? null;
+        if (!$adding && !is_array($posted)) {
+            $posted = self::massiveActionPosted($item);
+        }
         if (!is_array($posted)) {
             // Criação sem formulário (API, importação): só cobra os obrigatórios se o admin ligou.
             if (
@@ -106,7 +109,64 @@ final class Injector
             // O core só dispara item_update se algum campo do próprio item mudou;
             // gravar aqui garante que editar só os campos extras funcione.
             Saver::apply($item, $result['writes']);
+            if ($result['writes'] !== [] && array_key_exists('date_mod', $item->fields)) {
+                // Sem nenhuma coluna própria alterada o update() devolve false (a ação massiva
+                // contaria como falha): date_mod garante o retorno certo.
+                $item->input['date_mod'] = $_SESSION['glpi_currenttime'];
+            }
         }
+    }
+
+    /**
+     * Ação massiva "Atualizar" sobre um campo do plugin: o GLPI chama update() com
+     * `<coluna> => [id do campo => valor]` (ver FieldDefinition::massiveActionInput).
+     *
+     * @return array|null container_id => def_id => valor, no formato de `_morefields`
+     */
+    private static function massiveActionPosted(CommonDBTM $item): ?array
+    {
+        $raw = [];
+        // linkfield das opções de busca: padrão do GLPI para a tabela de valores, ou v_int nas listas.
+        foreach (['plugin_morefields_values_id', 'v_int'] as $column) {
+            $value = $item->input[$column] ?? null;
+            if (!is_array($value) || $value === []) {
+                continue;
+            }
+            foreach ($value as $def_id => $v) {
+                if (is_int($def_id) || ctype_digit((string) $def_id)) {
+                    $raw[(int) $def_id] = $v;
+                }
+            }
+            unset($item->input[$column]);
+        }
+        // "Item do GLPI": o dropdown padrão do GLPI não carrega o id do campo, que vem da opção
+        // de busca escolhida na própria requisição da ação massiva.
+        if (
+            array_key_exists('v_items_id', $item->input)
+            && ($_POST['action'] ?? '') === 'update'
+            && ($_POST['field'] ?? '') === 'v_items_id'
+        ) {
+            $def_id = (int) ($_POST['search_options'][$item::class] ?? 0) - FieldDefinition::SEARCH_OPTION_BASE;
+            if ($def_id > 0) {
+                $raw[$def_id] = $item->input['v_items_id'];
+                unset($item->input['v_items_id']);
+            }
+        }
+        if ($raw === []) {
+            return null;
+        }
+
+        $entity = $item->isEntityAssign() ? (int) ($item->fields['entities_id'] ?? 0) : null;
+        $posted = [];
+        foreach (Binding::getContainers($item::class, null, $entity) as $cid => $container) {
+            foreach (Binding::getContainerFields((int) $cid, null, null, null, $item::class) as $field) {
+                if (array_key_exists($field['def_id'], $raw)) {
+                    $posted[(int) $cid][$field['def_id']] = $raw[$field['def_id']];
+                }
+            }
+        }
+
+        return $posted;
     }
 
     public static function itemAdd(CommonDBTM $item): void

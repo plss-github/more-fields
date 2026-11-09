@@ -178,3 +178,25 @@ function plugin_morefields_getAddSearchOptionsNew($itemtype)
 {
     return FieldDefinition::getSearchOptionsForItemtype((string) $itemtype);
 }
+
+/**
+ * Ação massiva "Atualizar": controle de entrada dos campos do plugin (o GLPI só chama este
+ * gancho para tabelas de classes do plugin; ver Value). Devolve false para o que não é nosso.
+ */
+function plugin_morefields_MassiveActionsFieldsDisplay($options = [])
+{
+    $search = $options['options'] ?? [];
+    $id     = (int) ($search['morefields_id'] ?? 0);
+    if ($id <= 0) {
+        return false;
+    }
+    // O GLPI nomeia o campo do formulário pelo linkfield (escolha) ou, sem ele, pela coluna.
+    $column = (string) (!empty($search['linkfield']) ? $search['linkfield'] : ($search['field'] ?? ''));
+    $html   = FieldDefinition::massiveActionInput($id, $column);
+    if ($html === null) {
+        return false;
+    }
+    echo $html;
+
+    return true;
+}

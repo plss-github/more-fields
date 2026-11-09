@@ -79,6 +79,8 @@ class VisibilityRule extends AdminItem
             'entity'       => ['label' => __('Entidade', 'morefields'), 'options' => $pluck('glpi_entities', 'completename'), 'sons' => true],
             'itilcategory' => ['label' => __('Categoria ITIL', 'morefields'), 'options' => $pluck('glpi_itilcategories', 'completename'), 'sons' => true],
             'status'       => ['label' => __('Status (chamado)', 'morefields'), 'options' => array_map('strval', \Ticket::getAllStatusArray()), 'sons' => false],
+            'status_problem' => ['label' => __('Status (problema)', 'morefields'), 'options' => array_map('strval', \Problem::getAllStatusArray()), 'sons' => false],
+            'status_change'  => ['label' => __('Status (mudança)', 'morefields'), 'options' => array_map('strval', \Change::getAllStatusArray()), 'sons' => false],
             'type'         => ['label' => __('Tipo (chamado)', 'morefields'), 'options' => array_map('strval', \Ticket::getTypes()), 'sons' => false],
         ];
 
@@ -134,7 +136,7 @@ class VisibilityRule extends AdminItem
         $actions = self::getActions();
         $labels  = [
             'profile' => __('Perfil', 'morefields'), 'entity' => __('Entidade', 'morefields'), 'itilcategory' => __('Categoria ITIL', 'morefields'),
-            'status' => __('Status', 'morefields'), 'type' => __('Tipo', 'morefields'), 'field' => __('Outro campo', 'morefields'),
+            'status' => __('Status', 'morefields'), 'status_problem' => __('Status (problema)', 'morefields'), 'status_change' => __('Status (mudança)', 'morefields'), 'type' => __('Tipo', 'morefields'), 'field' => __('Outro campo', 'morefields'),
         ];
 
         if (self::canUpdate()) {
@@ -211,7 +213,7 @@ class VisibilityRule extends AdminItem
             $clean = [];
             foreach ($decoded as $c) {
                 $criterion = (string) ($c['c'] ?? '');
-                if (!in_array($criterion, ['profile', 'entity', 'itilcategory', 'status', 'type', 'field'], true)) {
+                if (!in_array($criterion, ['profile', 'entity', 'itilcategory', 'status', 'status_problem', 'status_change', 'type', 'field'], true)) {
                     continue;
                 }
                 $op = in_array($c['op'] ?? '', ['in', 'not_in', 'empty', 'not_empty'], true) ? $c['op'] : 'in';
